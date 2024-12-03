@@ -18,5 +18,9 @@ canvas_coordinates = [
 
 # Server details (example, add more as needed)
 servers = [
-    {"hostname": "185.244.218.206", "username": "Administrator", "password": "Asas1234"}
+    {
+        "hostname": "185.244.218.206",
+        "username": "Administrator",
+        "password": "Asas1234",
+    }
 ]
