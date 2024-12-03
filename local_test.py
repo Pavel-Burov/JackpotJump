@@ -46,16 +46,6 @@ def get_screen_size():
     return width, height
 
 
-def compute_grid(n):
-    """
-    Computes the number of rows and columns for arranging windows.
-    Tries to make the grid as square as possible.
-    """
-    cols = math.ceil(math.sqrt(n))
-    rows = math.ceil(n / cols)
-    return rows, cols
-
-
 def wait_for_splash_screen_to_disappear(page):
     """
     Waits for the splash screen to disappear.
@@ -156,8 +146,11 @@ def open_game_and_play(account_id: int, shared_state: SharedState, window_width:
                 start_game(page, account_id)
 
                 # Adjust the viewport size to fit within the window
+                # To ensure content fits, reduce viewport size slightly
+                adjusted_width = window_width - 100
+                adjusted_height = window_height - 100
                 page.set_viewport_size(
-                    {"width": window_width, "height": window_height})
+                    {"width": adjusted_width, "height": adjusted_height})
 
                 # Game loop for gameplay actions
                 while True:
@@ -244,29 +237,31 @@ def run_local_test():
     screen_width, screen_height = get_screen_size()
     print(f"Screen size: {screen_width}x{screen_height}")
 
-    # Compute grid layout
-    rows, cols = compute_grid(TEST_ACCOUNTS)
-    print(f"Grid layout: {rows} rows x {cols} columns")
-
     # Define usable width (left 2/3 of the screen)
     usable_width = (screen_width * 2) // 3
     usable_height = screen_height  # Full height
 
     # Compute window size
-    window_width = usable_width // cols
-    window_height = usable_height // rows
+    window_width = usable_width // TEST_ACCOUNTS
+    window_height = usable_height // TEST_ACCOUNTS
     print(f"Each window size: {window_width}x{window_height}")
+
+    # Define offset for overlapping
+    offset_x = 100  # pixels to shift right for each window
+    offset_y = 100  # pixels to shift down for each window
 
     with ThreadPoolExecutor(max_workers=TEST_ACCOUNTS) as executor:
         # Submit the accounts to the executor
         for account_id in range(TEST_ACCOUNTS):
-            # Compute row and column for this account
-            row = account_id // cols
-            col = account_id % cols
+            # Compute window position with overlap
+            window_x = account_id * offset_x
+            window_y = account_id * offset_y
 
-            # Compute window position within the usable area
-            window_x = col * window_width
-            window_y = row * window_height
+            # Ensure windows do not exceed usable screen area
+            if window_x + window_width > usable_width:
+                window_x = usable_width - window_width
+            if window_y + window_height > usable_height:
+                window_y = usable_height - window_height
 
             print(
                 f"Launching Account {account_id} at position ({window_x}, {window_y})")
@@ -297,7 +292,7 @@ def run_local_test():
             sys.exit(0)
 
         # Since the game loops are infinite, the script will keep running
-        # You can implement a mechanism to stop the threads gracefully if needed
+        # Implement a mechanism to stop the threads gracefully if needed
 
 
 if __name__ == "__main__":
