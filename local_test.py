@@ -8,7 +8,7 @@ import math
 import tkinter as tk
 
 # Configuration settings
-TEST_ACCOUNTS = 10  # Number of accounts to test (adjust as needed)
+TEST_ACCOUNTS = 4  # Number of accounts to test (adjust as needed)
 
 # Coordinates for the GameCanvas clicks (replace with your actual values)
 canvas_coordinates = [
@@ -84,11 +84,11 @@ def start_game(page, account_id):
     page.locator("#GameCanvas").click(position={"x": 669, "y": 642})
     time.sleep(0.5)
     page.locator("#GameCanvas").click(position={"x": 757, "y": 520})
-    time.sleep(1)
+    time.sleep(0.5)
     page.locator("#GameCanvas").click(position={"x": 757, "y": 520})
-    time.sleep(1)
+    time.sleep(0.5)
     page.locator("#GameCanvas").click(position={"x": 635, "y": 421})
-    time.sleep(1)
+    time.sleep(0.5)
     page.locator("#GameCanvas").click(position={"x": 635, "y": 421})
     print(f"Account {account_id} clicked the start button.")
 
@@ -248,9 +248,13 @@ def run_local_test():
     rows, cols = compute_grid(TEST_ACCOUNTS)
     print(f"Grid layout: {rows} rows x {cols} columns")
 
+    # Define usable width (left 2/3 of the screen)
+    usable_width = (screen_width * 2) // 3
+    usable_height = screen_height  # Full height
+
     # Compute window size
-    window_width = screen_width // cols
-    window_height = screen_height // rows
+    window_width = usable_width // cols
+    window_height = usable_height // rows
     print(f"Each window size: {window_width}x{window_height}")
 
     with ThreadPoolExecutor(max_workers=TEST_ACCOUNTS) as executor:
@@ -260,7 +264,7 @@ def run_local_test():
             row = account_id // cols
             col = account_id % cols
 
-            # Compute window position
+            # Compute window position within the usable area
             window_x = col * window_width
             window_y = row * window_height
 
@@ -268,8 +272,15 @@ def run_local_test():
                 f"Launching Account {account_id} at position ({window_x}, {window_y})")
 
             # Submit the task with window size and position
-            executor.submit(open_game_and_play, account_id, shared_state,
-                            window_width, window_height, window_x, window_y)
+            executor.submit(
+                open_game_and_play,
+                account_id,
+                shared_state,
+                window_width,
+                window_height,
+                window_x,
+                window_y
+            )
             print(f"Account {account_id} submitted to executor.")
 
         # Wait until all accounts are ready
