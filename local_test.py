@@ -1,12 +1,14 @@
 import time
-from playwright.sync_api import Playwright, sync_playwright
+from playwright.sync_api import sync_playwright
 from concurrent.futures import ThreadPoolExecutor
 import threading
 import signal
 import sys
+import math
+import tkinter as tk
 
 # Configuration settings
-TEST_ACCOUNTS = 2  # Number of accounts to test (local test)
+TEST_ACCOUNTS = 10  # Number of accounts to test (adjust as needed)
 
 # Coordinates for the GameCanvas clicks (replace with your actual values)
 canvas_coordinates = [
@@ -30,6 +32,28 @@ class SharedState:
         self.lock = threading.Lock()
         self.all_ready_event = threading.Event()
         self.start_event = threading.Event()
+
+
+def get_screen_size():
+    """
+    Retrieves the screen width and height using tkinter.
+    """
+    root = tk.Tk()
+    root.withdraw()  # Hide the main window
+    width = root.winfo_screenwidth()
+    height = root.winfo_screenheight()
+    root.destroy()
+    return width, height
+
+
+def compute_grid(n):
+    """
+    Computes the number of rows and columns for arranging windows.
+    Tries to make the grid as square as possible.
+    """
+    cols = math.ceil(math.sqrt(n))
+    rows = math.ceil(n / cols)
+    return rows, cols
 
 
 def wait_for_splash_screen_to_disappear(page):
@@ -84,15 +108,24 @@ def prompt_for_start():
             print("Invalid input. Please enter 'y' to start or 'n' to exit.")
 
 
-def open_game_and_play(account_id: int, shared_state: SharedState):
+def open_game_and_play(account_id: int, shared_state: SharedState, window_width: int, window_height: int, window_x: int, window_y: int):
     """
     Handles the game interaction for each account.
     """
     try:
         with sync_playwright() as p:
-            # Launch the browser (Non-headless mode for testing)
-            browser = p.chromium.launch(headless=False)
-            context = browser.new_context()
+            # Launch the browser with specific window size and position
+            browser = p.chromium.launch(
+                headless=False,
+                args=[
+                    f'--window-size={window_width},{window_height}',
+                    f'--window-position={window_x},{window_y}'
+                ]
+            )
+            context = browser.new_context(
+                # Example permissions; adjust as needed
+                permissions=['geolocation', 'notifications']
+            )
             page = context.new_page()
 
             # Navigate to the game page
@@ -121,6 +154,10 @@ def open_game_and_play(account_id: int, shared_state: SharedState):
                 print(f"Account {account_id} is starting the game.")
                 # Start the game actions
                 start_game(page, account_id)
+
+                # Adjust the viewport size to fit within the window
+                page.set_viewport_size(
+                    {"width": window_width, "height": window_height})
 
                 # Game loop for gameplay actions
                 while True:
@@ -203,10 +240,36 @@ def run_local_test():
     """
     shared_state = SharedState(TEST_ACCOUNTS)
 
+    # Get screen size
+    screen_width, screen_height = get_screen_size()
+    print(f"Screen size: {screen_width}x{screen_height}")
+
+    # Compute grid layout
+    rows, cols = compute_grid(TEST_ACCOUNTS)
+    print(f"Grid layout: {rows} rows x {cols} columns")
+
+    # Compute window size
+    window_width = screen_width // cols
+    window_height = screen_height // rows
+    print(f"Each window size: {window_width}x{window_height}")
+
     with ThreadPoolExecutor(max_workers=TEST_ACCOUNTS) as executor:
         # Submit the accounts to the executor
         for account_id in range(TEST_ACCOUNTS):
-            executor.submit(open_game_and_play, account_id, shared_state)
+            # Compute row and column for this account
+            row = account_id // cols
+            col = account_id % cols
+
+            # Compute window position
+            window_x = col * window_width
+            window_y = row * window_height
+
+            print(
+                f"Launching Account {account_id} at position ({window_x}, {window_y})")
+
+            # Submit the task with window size and position
+            executor.submit(open_game_and_play, account_id, shared_state,
+                            window_width, window_height, window_x, window_y)
             print(f"Account {account_id} submitted to executor.")
 
         # Wait until all accounts are ready
@@ -222,7 +285,6 @@ def run_local_test():
             print("Start event not set. Exiting...")
             sys.exit(0)
 
-        # Optionally, wait for all threads to complete
         # Since the game loops are infinite, the script will keep running
         # You can implement a mechanism to stop the threads gracefully if needed
 
